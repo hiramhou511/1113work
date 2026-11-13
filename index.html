@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>當日品管 NG 異常清單管理系統 | QC Daily NG List</title>
+    <!-- 引入 SheetJS 處理 Excel 匯出 -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- 🟢【已加入】LINE LIFF SDK 引入 -->
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+        :root {
+            --primary-dark: #0f4c3a;
+            --primary-green: #15803d;
+            --primary-light: #22c55e;
+            --mint-bg: #f0fdf4;
+            --surface-card: #ffffff;
+            --border-color: #dcfce7;
+            --border-dark: #bbf7d0;
+            --text-main: #143528;
+            --text-muted: #52796f;
+            --danger: #dc2626;
+            --danger-bg: #fee2e2;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 12px rgba(15, 76, 58, 0.08);
+            --radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Microsoft JhengHei", "Noto Sans Thai", sans-serif;
+        }
+
+        body {
+            background-color: #f7faf8;
+            color: var(--text-main);
+            padding: 24px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1320px;
+            margin: 0 auto;
+        }
+
+        /* 頂部 Header 與下載按鈕區 */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--surface-card);
+            padding: 18px 26px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-md);
+            border-left: 6px solid var(--primary-green);
+            margin-bottom: 24px;
+            border-top: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .header-title h1 {
+            font-size: 1.55rem;
+            color: var(--primary-dark);
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-title p {
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .action-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        /* 語言切換選單 */
+        .lang-switch-box {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #ffffff;
+            border: 1.5px solid var(--border-dark);
+            padding: 6px 10px;
+            border-radius: 6px;
+            color: var(--primary-dark);
+            font-weight: 600;
+            font-size: 0.88rem;
+        }
+
+        .lang-select {
+            border: none;
+            outline: none;
+            background: transparent;
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: var(--primary-dark);
+            cursor: pointer;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 9px 16px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+            white-space: nowrap;
+        }
+
+        .btn-html {
+            background-color: #ecfdf5;
+            color: var(--primary-dark);
+            border-color: #a7f3d0;
+        }
+        .btn-html:hover {
+            background-color: #d1fae5;
+            transform: translateY(-1px);
+        }
+
+        .btn-excel {
+            background-color: var(--primary-green);
+            color: #ffffff;
+            box-shadow: 0 2px 6px rgba(21, 128, 61, 0.22);
+        }
+        .btn-excel:hover {
+            background-color: #166534;
+            transform: translateY(-1px);
+        }
+
+        .btn-add {
+            background-color: #047857;
+            color: white;
+        }
+        .btn-add:hover {
+            background-color: #065f46;
+        }
+
+        /* 統計摘要條 */
+        .summary-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .summary-card {
+            background: white;
+            padding: 16px 20px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .summary-card .label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .summary-card .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-dark);
+        }
+
+        /* 主表格區域 */
+        .card {
+            background: var(--surface-card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 16px 24px;
+            background-color: #f9fdfa;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--primary-dark);
+        }
+
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.92rem;
+        }
+
+        thead {
+            background-color: #eafaf1;
+            color: var(--primary-dark);
+        }
+
+        th, td {
+            padding: 14px 18px;
+            border-bottom: 1px solid #eef7f2;
+            vertical-align: middle;
+        }
+
+        th {
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+
+        tbody tr:hover {
+            background-color: #f4fbf7;
+        }
+
+        /* NG 圖片縮圖 */
+        .img-thumb-container {
+            width: 58px;
+            height: 58px;
+            border-radius: 6px;
+            border: 1px solid #d1fae5;
+            background-color: #f8fafc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .img-thumb-container:hover {
+            transform: scale(1.06);
+            border-color: var(--primary-green);
+        }
+
+        .img-thumb {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .no-img-text {
+            font-size: 0.72rem;
+            color: #94a3b8;
+            text-align: center;
+        }
+
+        /* 標籤樣式 */
+        .badge {
+            display: inline-block;
+            padding: 4px 9px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .badge-material {
+            background-color: #e0f2fe;
+            color: #0369a1;
+        }
+        .badge-qty {
+            background-color: var(--danger-bg);
+            color: var(--danger);
+            font-size: 0.88rem;
+        }
+
+        /* 操作按鈕 */
+        .btn-action-edit {
+            background-color: #f0fdf4;
+            color: var(--primary-green);
+            border: 1px solid #86efac;
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-size: 0.82rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn-action-edit:hover {
+            background-color: var(--primary-green);
+            color: white;
+        }
+
+        .btn-action-del {
+            background-color: transparent;
+            color: #94a3b8;
+            border: none;
+            padding: 5px 8px;
+            cursor: pointer;
+            font-size: 0.82rem;
+            margin-left: 4px;
+        }
+        .btn-action-del:hover {
+            color: var(--danger);
+        }
+
+        /* 彈出視窗 (Modal) */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 35, 25, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(3px);
+        }
+
+        .modal-card {
+            background: white;
+            border-radius: var(--radius);
+            width: 100%;
+            max-width: 580px;
+            padding: 26px;
+            box-shadow: 0 16px 36px rgba(0,0,0,0.18);
+            border-top: 5px solid var(--primary-green);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            color: var(--primary-dark);
+            font-weight: 700;
+        }
+
+        .close-btn {
+            background: transparent;
+            border: none;
+            font-size: 1.4rem;
+            cursor: pointer;
+            color: #94a3b8;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group.full {
+            grid-column: span 2;
+        }
+
+        label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        input[type="text"], input[type="number"], input[type="date"] {
+            padding: 9px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 5px;
+            font-size: 0.92rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            border-color: var(--primary-green);
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
+        }
+
+        .preview-box {
+            margin-top: 6px;
+            width: 100%;
+            height: 120px;
+            border: 2px dashed #bbf7d0;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fdfefe;
+            overflow: hidden;
+        }
+
+        .preview-box img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .modal-footer {
+            margin-top: 24px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        /* 圖片放大檢視 Lightbox */
+        .lightbox-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.75);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            cursor: pointer;
+        }
+        .lightbox-overlay img {
+            max-width: 90vw;
+            max-height: 85vh;
+            border-radius: 6px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 3px solid #ffffff;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- 頂端欄與下載動作按鈕 -->
+    <header>
+        <div class="header-title">
+            <h1>
+                <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="#15803d" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    <path d="m9 12 2 2 4-4"/>
+                </svg>
+                <span data-i18n="mainTitle">當日品管 NG 異常清單</span>
+            </h1>
+            <p data-i18n="subTitle">日常產線瑕疵記錄、覆核修正與即時資料匯出系統</p>
+        </div>
+
+        <div class="action-toolbar">
+            <!-- 語言轉換下拉選單 -->
+            <div class="lang-switch-box">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#15803d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="2" y1="12" x2="22" y2="12"></line>
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                </svg>
+                <select id="languageSelect" class="lang-select" onchange="changeLanguage(this.value)">
+                    <option value="zh">繁體中文 (Chinese)</option>
+                    <option value="id">Bahasa Indonesia (印尼文)</option>
+                    <option value="th">ภาษาไทย (泰文)</option>
+                </select>
+            </div>
+
+            <button class="btn btn-add" onclick="openModal()">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span data-i18n="btnAdd">新增不良紀錄</span>
+            </button>
+            <button class="btn btn-html" onclick="downloadHTML()">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path></svg>
+                <span data-i18n="btnHtml">下載 HTML</span>
+            </button>
+            <button class="btn btn-excel" onclick="exportToExcel()">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                <span data-i18n="btnExcel">輸出 Excel 下載</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- 數據摘要 -->
+    <div class="summary-bar">
+        <div class="summary-card">
+            <div>
+                <div class="label" data-i18n="sumTodayCases">今日異常件數</div>
+                <div class="value" id="total-records">0</div>
+            </div>
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        </div>
+        <div class="summary-card">
+            <div>
+                <div class="label" data-i18n="sumTotalQty">累計 NG 個數</div>
+                <div class="value" id="total-ng-qty" style="color: var(--danger);">0</div>
+            </div>
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="1.8"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+        </div>
+        <div class="summary-card">
+            <div>
+                <div class="label" data-i18n="sumStatus">狀態檢核</div>
+                <div class="value" style="font-size: 1.05rem; color: #15803d; margin-top: 5px;" data-i18n="sumStatusDesc">可修改重存回傳</div>
+            </div>
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#15803d" stroke-width="1.8"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+        </div>
+    </div>
+
+    <!-- 表格卡片 -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title" data-i18n="tableTitle">異常部品明細清單</div>
+            <span style="font-size: 0.85rem; color: var(--text-muted);" data-i18n="tableTip">點擊圖片縮圖可檢視大圖；點擊「修改」可更正內容</span>
+        </div>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 60px;" data-i18n="thIndex">項次</th>
+                        <th data-i18n="thDate">日期</th>
+                        <th data-i18n="thPartNo">部品料號</th>
+                        <th data-i18n="thDrawingNo">圖號</th>
+                        <th data-i18n="thMaterial">材質</th>
+                        <th data-i18n="thQty">個數</th>
+                        <th data-i18n="thImage">NG 位置圖片</th>
+                        <th style="text-align: center; width: 140px;" data-i18n="thAction">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="ng-table-body">
+                    <!-- 動態渲染資料 -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- 新增 / 修改彈出視窗 -->
+<div class="modal-overlay" id="recordModal">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h2 class="modal-title" id="modalTitle" data-i18n="modalAddTitle">新增 NG 異常紀錄</h2>
+            <button class="close-btn" onclick="closeModal()">&times;</button>
+        </div>
+        <form id="ngForm" onsubmit="handleFormSubmit(event)">
+            <input type="hidden" id="edit-id">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label data-i18n="labelDate">記錄日期</label>
+                    <input type="date" id="input-date" required>
+                </div>
+                <div class="form-group">
+                    <label data-i18n="labelQty">個數 (Quantity)</label>
+                    <input type="number" id="input-qty" min="1" required placeholder="1">
+                </div>
+                <div class="form-group">
+                    <label data-i18n="labelPartNo">部品料號 (Part No.)</label>
+                    <input type="text" id="input-partNo" required placeholder="如: P-2026-A109">
+                </div>
+                <div class="form-group">
+                    <label data-i18n="labelDrawingNo">圖號 (Drawing No.)</label>
+                    <input type="text" id="input-drawingNo" required placeholder="如: DWG-8842">
+                </div>
+                <div class="form-group full">
+                    <label data-i18n="labelMaterial">材質 (Material)</label>
+                    <input type="text" id="input-material" required placeholder="如: SUS304 / AL6061 / 鍍鋅鋼板">
+                </div>
+                <div class="form-group full">
+                    <label data-i18n="labelImage">NG 位置圖片 (點選或更換圖片)</label>
+                    <input type="file" id="input-image" accept="image/*" onchange="previewFile(event)">
+                    <div class="preview-box" id="previewContainer">
+                        <span style="font-size: 0.85rem; color: #94a3b8;" id="previewText" data-i18n="noImageSelected">尚未選取圖片</span>
+                        <img id="imagePreview" style="display: none;" alt="NG Preview">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" style="background: #e2e8f0; color: #475569;" onclick="closeModal()" data-i18n="btnCancel">取消</button>
+                <button type="submit" class="btn btn-excel" data-i18n="btnSave">確認儲存</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 圖片放大預覽視窗 -->
+<div class="lightbox-overlay" id="lightbox" onclick="closeLightbox()">
+    <img id="lightbox-img" src="" alt="大圖檢視">
+</div>
+
+<!-- 核心資料儲存標籤 -->
+<script id="embedded-data" type="application/json">
+[
+    {
+        "id": "1",
+        "date": "2026-03-30",
+        "partNo": "PN-A208-T",
+        "drawingNo": "DWG-2026-081",
+        "material": "SUS304 不銹鋼",
+        "quantity": 3,
+        "image": ""
+    },
+    {
+        "id": "2",
+        "date": "2026-03-30",
+        "partNo": "PN-C550-B",
+        "drawingNo": "DWG-1994-012",
+        "material": "AL6061-T6 鋁合金",
+        "quantity": 1,
+        "image": ""
+    }
+]
+</script>
+
+<script>
+    /* =======================================
+       多語言字典庫 (i18n Dictionary)
+       支援：繁體中文(zh)、印尼文(id)、泰文(th)
+    ======================================= */
+    const translations = {
+        zh: {
+            mainTitle: "當日品管 NG 異常清單",
+            subTitle: "日常產線瑕疵記錄、覆核修正與即時資料匯出系統",
+            btnAdd: "新增不良紀錄",
+            btnHtml: "下載 HTML",
+            btnExcel: "輸出 Excel 下載",
+            sumTodayCases: "今日異常件數",
+            sumTotalQty: "累計 NG 個數",
+            sumStatus: "狀態檢核",
+            sumStatusDesc: "可修改重存回傳",
+            tableTitle: "異常部品明細清單",
+            tableTip: "點擊圖片縮圖可檢視大圖；點擊「修改」可更正內容",
+            thIndex: "項次",
+            thDate: "日期",
+            thPartNo: "部品料號",
+            thDrawingNo: "圖號",
+            thMaterial: "材質",
+            thQty: "個數",
+            thImage: "NG 位置圖片",
+            thAction: "操作",
+            unitPcs: "件",
+            noImage: "無圖片",
+            btnEdit: "修改",
+            btnDel: "刪除",
+            emptyTable: "目前尚無 NG 異常紀錄，請點選上方按鈕新增。",
+            modalAddTitle: "新增 NG 異常紀錄",
+            modalEditTitle: "修改 NG 異常紀錄",
+            labelDate: "記錄日期",
+            labelQty: "個數 (Quantity)",
+            labelPartNo: "部品料號 (Part No.)",
+            labelDrawingNo: "圖號 (Drawing No.)",
+            labelMaterial: "材質 (Material)",
+            labelImage: "NG 位置圖片 (點選或更換圖片)",
+            noImageSelected: "尚未選取圖片",
+            btnCancel: "取消",
+            btnSave: "確認儲存",
+            confirmDel: "確定要刪除這筆 NG 紀錄嗎？",
+            noDataExport: "目前尚無資料可匯出！",
+            excelSheetName: "當日NG清單",
+            excelColIndex: "項次",
+            excelColDate: "日期",
+            excelColPartNo: "部品料號",
+            excelColDrawingNo: "圖號",
+            excelColMaterial: "材質",
+            excelColQty: "NG個數",
+            excelColImageNote: "NG位置圖片備註",
+            excelImgHas: "已包含檢驗圖檔 (詳見系統)",
+            excelImgNone: "無附圖"
+        },
+        id: {
+            mainTitle: "Daftar Cacat Kualitas Harian (NG)",
+            subTitle: "Pencatatan Cacat Produksi, Koreksi & Sistem Ekspor Data Real-time",
+            btnAdd: "Tambah Data NG",
+            btnHtml: "Unduh HTML",
+            btnExcel: "Ekspor ke Excel",
+            sumTodayCases: "Total Kasus Hari Ini",
+            sumTotalQty: "Akumulasi Jumlah NG",
+            sumStatus: "Pemeriksaan Status",
+            sumStatusDesc: "Dapat Diedit & Disimpan Ulang",
+            tableTitle: "Daftar Rincian Suku Cadang Cacat (NG)",
+            tableTip: "Klik gambar mini untuk perbesar; klik 'Edit' untuk memperbaiki data",
+            thIndex: "No.",
+            thDate: "Tanggal",
+            thPartNo: "Nomor Part",
+            thDrawingNo: "Nomor Gambar",
+            thMaterial: "Material",
+            thQty: "Jumlah",
+            thImage: "Foto Posisi NG",
+            thAction: "Tindakan",
+            unitPcs: "pcs",
+            noImage: "Tanpa Foto",
+            btnEdit: "Edit",
+            btnDel: "Hapus",
+            emptyTable: "Belum ada catatan NG. Silakan klik tombol di atas untuk menambahkan.",
+            modalAddTitle: "Tambah Catatan Cacat NG",
+            modalEditTitle: "Edit Catatan Cacat NG",
+            labelDate: "Tanggal Pencatatan",
+            labelQty: "Jumlah (Quantity)",
+            labelPartNo: "Nomor Part (Part No.)",
+            labelDrawingNo: "Nomor Gambar (Drawing No.)",
+            labelMaterial: "Material (Bahan)",
+            labelImage: "Foto Posisi NG (Pilih atau ganti foto)",
+            noImageSelected: "Belum ada foto yang dipilih",
+            btnCancel: "Batal",
+            btnSave: "Simpan Data",
+            confirmDel: "Apakah Anda yakin ingin menghapus data NG ini?",
+            noDataExport: "Tidak ada data untuk diekspor!",
+            excelSheetName: "Daftar NG Harian",
+            excelColIndex: "No.",
+            excelColDate: "Tanggal",
+            excelColPartNo: "Nomor Part",
+            excelColDrawingNo: "Nomor Gambar",
+            excelColMaterial: "Material",
+            excelColQty: "Jumlah NG",
+            excelColImageNote: "Catatan Foto NG",
+            excelImgHas: "Tersedia Foto Inspeksi (Lihat Sistem)",
+            excelImgNone: "Tidak Ada Foto"
+        },
+        th: {
+            mainTitle: "รายการของเสีย NG ประจำวัน",
+            subTitle: "ระบบบันทึกข้อบกพร่องในสายการผลิต แก้ไขตรวจสอบ และส่งออกข้อมูล",
+            btnAdd: "เพิ่มรายการ NG",
+            btnHtml: "ดาวน์โหลด HTML",
+            btnExcel: "ส่งออก Excel",
+            sumTodayCases: "จำนวนกรณีวันนี้",
+            sumTotalQty: "จำนวนชิ้น NG สะสม",
+            sumStatus: "การตรวจสอบสถานะ",
+            sumStatusDesc: "แก้ไขและบันทึกซ้ำได้",
+            tableTitle: "รายการชิ้นส่วนที่บกพร่อง (NG)",
+            tableTip: "คลิกภาพขนาดย่อเพื่อดูภาพขยาย คลิก 'แก้ไข' เพื่อแก้ไขข้อมูล",
+            thIndex: "ลำดับ",
+            thDate: "วันที่",
+            thPartNo: "รหัสชิ้นส่วน",
+            thDrawingNo: "เลขที่แบบ",
+            thMaterial: "วัสดุ",
+            thQty: "จำนวน",
+            thImage: "รูปภาพตำแหน่ง NG",
+            thAction: "จัดการ",
+            unitPcs: "ชิ้น",
+            noImage: "ไม่มีรูปภาพ",
+            btnEdit: "แก้ไข",
+            btnDel: "ลบ",
+            emptyTable: "ยังไม่มีบันทึก NG กรุณาคลิกปุ่มด้านบนเพื่อเพิ่มข้อมูล",
+            modalAddTitle: "เพิ่มบันทึกข้อบกพร่อง NG",
+            modalEditTitle: "แก้ไขบันทึกข้อบกพร่อง NG",
+            labelDate: "วันที่บันทึก",
+            labelQty: "จำนวน (Quantity)",
+            labelPartNo: "รหัสชิ้นส่วน (Part No.)",
+            labelDrawingNo: "เลขที่แบบ (Drawing No.)",
+            labelMaterial: "วัสดุ (Material)",
+            labelImage: "รูปภาพตำแหน่ง NG (เลือกหรือเปลี่ยนรูป)",
+            noImageSelected: "ยังไม่ได้เลือกรูปภาพ",
+            btnCancel: "ยกเลิก",
+            btnSave: "ยืนยันบันทึก",
+            confirmDel: "คุณแน่ใจหรือไม่ว่าต้องการลบบันทึก NG นี้?",
+            noDataExport: "ไม่มีข้อมูลที่จะส่งออก!",
+            excelSheetName: "รายการ NG ประจำวัน",
+            excelColIndex: "ลำดับ",
+            excelColDate: "วันที่",
+            excelColPartNo: "รหัสชิ้นส่วน",
+            excelColDrawingNo: "เลขที่แบบ",
+            excelColMaterial: "วัสดุ",
+            excelColQty: "จำนวน NG",
+            excelColImageNote: "หมายเหตุรูปภาพ NG",
+            excelImgHas: "มีรูปภาพการตรวจสอบ (ดูในระบบ)",
+            excelImgNone: "ไม่มีรูปภาพ"
+        }
+    };
+
+    let currentLang = 'zh';
+
+    // 初始化載入資料
+    let dataList = [];
+    try {
+        const raw = document.getElementById('embedded-data').textContent;
+        dataList = JSON.parse(raw);
+    } catch (e) {
+        dataList = [];
+    }
+
+    let currentEditingImageBase64 = "";
+
+    // 🟢【已設定】LINE LIFF 初始化函數與正式 ID
+    async function initializeLiff() {
+        try {
+            await liff.init({ liffId: "2012592487-8nsu4TEe" });
+            
+            if (liff.isLoggedIn()) {
+                const profile = await liff.getProfile();
+                console.log("當前登入的 LINE 用戶: " + profile.displayName);
+            } else {
+                liff.login();
+            }
+        } catch (err) {
+            console.log("LIFF 初始化失敗（可能是在一般瀏覽器中測試）: ", err);
+        }
+    }
+
+    // 格式化當前日期為 YYYY-MM-DD
+    function getTodayString() {
+        const today = new Date();
+        const y = today.getFullYear();
+        const m = String(today.getMonth() + 1).padStart(2, '0');
+        const d = String(today.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    // 切換語言核心邏輯
+    function changeLanguage(lang) {
+        currentLang = lang;
+        const dict = translations[lang] || translations.zh;
+
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            if (dict[key]) {
+                el.innerText = dict[key];
+            }
+        });
+
+        renderTable();
+    }
+
+    // 🟢 頁面初次載入時，同時執行 LIFF 初始化與語言載入
+    window.addEventListener('DOMContentLoaded', () => {
+        initializeLiff(); // 執行 LINE LIFF 初始化
+        changeLanguage(currentLang);
+    });
+
+    // 繪製表格與統計
+    function renderTable() {
+        const tbody = document.getElementById('ng-table-body');
+        tbody.innerHTML = '';
+        const dict = translations[currentLang];
+
+        let totalQty = 0;
+
+        if (dataList.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 40px; color: #94a3b8;">${dict.emptyTable}</td></tr>`;
+        } else {
+            dataList.forEach((item, index) => {
+                totalQty += Number(item.quantity) || 0;
+                const tr = document.createElement('tr');
+
+                let imgHtml = `<div class="img-thumb-container"><span class="no-img-text">${dict.noImage}</span></div>`;
+                if (item.image) {
+                    imgHtml = `<div class="img-thumb-container" onclick="openLightbox('${item.image}')">
+                                <img src="${item.image}" class="img-thumb" alt="NG Image">
+                               </div>`;
+                }
+
+                tr.innerHTML = `
+                    <td style="font-weight: 600; color: #64748b;">${index + 1}</td>
+                    <td>${item.date}</td>
+                    <td><strong>${item.partNo}</strong></td>
+                    <td style="color: #475569;">${item.drawingNo}</td>
+                    <td><span class="badge badge-material">${item.material}</span></td>
+                    <td><span class="badge badge-qty">${item.quantity} ${dict.unitPcs}</span></td>
+                    <td>${imgHtml}</td>
+                    <td style="text-align: center;">
+                        <button class="btn-action-edit" onclick="editRecord('${item.id}')">${dict.btnEdit}</button>
+                        <button class="btn-action-del" onclick="deleteRecord('${item.id}')">${dict.btnDel}</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        document.getElementById('total-records').innerText = dataList.length;
+        document.getElementById('total-ng-qty').innerText = totalQty;
+    }
+
+    // 打開新增/修改視窗
+    function openModal(isEdit = false) {
+        document.getElementById('recordModal').style.display = 'flex';
+        const dict = translations[currentLang];
+        if (!isEdit) {
+            document.getElementById('modalTitle').innerText = dict.modalAddTitle;
+            document.getElementById('ngForm').reset();
+            document.getElementById('edit-id').value = "";
+            document.getElementById('input-date').value = getTodayString();
+            currentEditingImageBase64 = "";
+            resetPreview();
+        }
+    }
+
+    function closeModal() {
+        document.getElementById('recordModal').style.display = 'none';
+    }
+
+    function previewFile(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                currentEditingImageBase64 = e.target.result;
+                displayPreview(currentEditingImageBase64);
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function displayPreview(src) {
+        const img = document.getElementById('imagePreview');
+        const text = document.getElementById('previewText');
+        img.src = src;
+        img.style.display = 'block';
+        text.style.display = 'none';
+    }
+
+    function resetPreview() {
+        const img = document.getElementById('imagePreview');
+        const text = document.getElementById('previewText');
+        img.src = '';
+        img.style.display = 'none';
+        text.style.display = 'block';
+    }
+
+    function editRecord(id) {
+        const target = dataList.find(x => x.id === id);
+        if (!target) return;
+
+        openModal(true);
+        const dict = translations[currentLang];
+        document.getElementById('modalTitle').innerText = dict.modalEditTitle;
+        document.getElementById('edit-id').value = target.id;
+        document.getElementById('input-date').value = target.date;
+        document.getElementById('input-partNo').value = target.partNo;
+        document.getElementById('input-drawingNo').value = target.drawingNo;
+        document.getElementById('input-material').value = target.material;
+        document.getElementById('input-qty').value = target.quantity;
+
+        currentEditingImageBase64 = target.image || "";
+        if (currentEditingImageBase64) {
+            displayPreview(currentEditingImageBase64);
+        } else {
+            resetPreview();
+        }
+    }
+
+    function handleFormSubmit(e) {
+        e.preventDefault();
+        const editId = document.getElementById('edit-id').value;
+
+        const record = {
+            id: editId ? editId : Date.now().toString(),
+            date: document.getElementById('input-date').value,
+            partNo: document.getElementById('input-partNo').value.trim(),
+            drawingNo: document.getElementById('input-drawingNo').value.trim(),
+            material: document.getElementById('input-material').value.trim(),
+            quantity: Number(document.getElementById('input-qty').value),
+            image: currentEditingImageBase64
+        };
+
+        if (editId) {
+            const index = dataList.findIndex(item => item.id === editId);
+            if (index !== -1) {
+                dataList[index] = record;
+            }
+        } else {
+            dataList.unshift(record);
+        }
+
+        renderTable();
+        closeModal();
+    }
+
+    function deleteRecord(id) {
+        const dict = translations[currentLang];
+        if (confirm(dict.confirmDel)) {
+            dataList = dataList.filter(item => item.id !== id);
+            renderTable();
+        }
+    }
+
+    function openLightbox(src) {
+        document.getElementById('lightbox-img').src = src;
+        document.getElementById('lightbox').style.display = 'flex';
+    }
+
+    function closeLightbox() {
+        document.getElementById('lightbox').style.display = 'none';
+    }
+
+    /* ------------------------
+       匯出與下載功能
+    ------------------------ */
+    function exportToExcel() {
+        const dict = translations[currentLang];
+        if (dataList.length === 0) {
+            alert(dict.noDataExport);
+            return;
+        }
+
+        const excelRows = dataList.map((item, idx) => {
+            const row = {};
+            row[dict.excelColIndex] = idx + 1;
+            row[dict.excelColDate] = item.date;
+            row[dict.excelColPartNo] = item.partNo;
+            row[dict.excelColDrawingNo] = item.drawingNo;
+            row[dict.excelColMaterial] = item.material;
+            row[dict.excelColQty] = item.quantity;
+            row[dict.excelColImageNote] = item.image ? dict.excelImgHas : dict.excelImgNone;
+            return row;
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(excelRows);
+
+        worksheet['!cols'] = [
+            { wch: 6 },
+            { wch: 12 },
+            { wch: 18 },
+            { wch: 16 },
+            { wch: 16 },
+            { wch: 12 },
+            { wch: 26 }
+        ];
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, dict.excelSheetName);
+
+        const dateStr = getTodayString().replace(/-/g, "");
+        XLSX.writeFile(workbook, `QC_NG_Report_${currentLang}_${dateStr}.xlsx`);
+    }
+
+    function downloadHTML() {
+        const dataScript = document.getElementById('embedded-data');
+        dataScript.textContent = JSON.stringify(dataList, null, 4);
+
+        document.getElementById('languageSelect').value = currentLang;
+
+        const currentHTML = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+        const blob = new Blob([currentHTML], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const dateStr = getTodayString().replace(/-/g, "");
+        a.href = url;
+        a.download = `QC_NG_List_${currentLang}_${dateStr}.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+</script>
+
+</body>
+</html>
